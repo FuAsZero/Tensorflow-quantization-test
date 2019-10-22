@@ -4,6 +4,8 @@ from utils.load_weights import weight_loader
 from pkl_reader import DataGenerator
 import tensorflow as tf
 
+import numpy as np
+
 weights = {'vgg': 'vgg16_weights_tf_dim_ordering_tf_kernels.h5',
            'resnet': 'resnet50_weights_tf_dim_ordering_tf_kernels.h5',
            'inception': 'inception_v3_weights_tf_dim_ordering_tf_kernels.h5',
@@ -48,7 +50,7 @@ if __name__ == '__main__':
     dg = DataGenerator('./data/val224_compressed.pkl', model=args.model, dtype='float32')
     with tf.device('/cpu:0'):
         if args.model == 'resnet':
-            logits = resnet50.ResNet50(X, weights)
+            logits = resnet50.ResNet50(X, weights, out_dict, input_dict)
         elif args.model == 'inception':
             logits = inception_v3.InceptionV3(X, weights)
         elif args.model == 'vgg':
@@ -65,12 +67,32 @@ if __name__ == '__main__':
     acc = 0.
     acc_top5 = 0.
     print('Start evaluating {}'.format(args.model))
+    ch_num = 16
     with tf.Session() as sess:
         for im, label in dg.generator():
-            t1, t5 = sess.run([pred, prediction], feed_dict={X: im})
-            if t1[0] == label:
-                acc += 1
-            if label in top5_acc(t5[0].tolist()):
-                acc_top5 += 1
-        print('Top1 accuracy: {}'.format(acc / 50000))
-        print('Top5 accuracy: {}'.format(acc_top5 / 50000))
+            out, in_dict = sess.run([out_dict, input_dict], feed_dict={X: im})
+#            for k, v in out.items():
+#                print(k, v)
+            for key, value in in_dict.items():
+                print(key)
+
+                total_size = value.size
+                FP32_ch_zero = 0
+                for i in range(value.shape[1]):
+                    for j in range(value.shape[2]):
+                        for k in range(0, value.shape[3], ch_num):
+                            b = value[:, i, j, (k):(k + ch_num)]
+#                            print(b.size)
+                            if np.count_nonzero(b) == 0:
+                                FP32_ch_zero += 1
+
+                FP32_ch_zero_ratio = FP32_ch_zero * ch_num / total_size
+                print(total_size, FP32_ch_zero, FP32_ch_zero_ratio)
+
+#            t1, t5 = sess.run([pred, prediction], feed_dict={X: im})
+#            if t1[0] == label:
+#                acc += 1
+#            if label in top5_acc(t5[0].tolist()):
+#                acc_top5 += 1
+#        print('Top1 accuracy: {}'.format(acc / 50000))
+#        print('Top5 accuracy: {}'.format(acc_top5 / 50000))
