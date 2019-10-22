@@ -421,3 +421,5 @@ PointNet
 
 [keras-FP16-test](https://github.com/TianzhongSong/keras-FP16-test)
 
+### log weights/"input tensor" sparsity
+use dictionary 'key' save conv layer name, coresponding 'value' save related statistics.
