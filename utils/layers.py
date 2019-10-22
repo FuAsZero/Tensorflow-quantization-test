@@ -1,12 +1,32 @@
 import tensorflow as tf
+import numpy as np
 
-
-def quantize(x):
+def print_info(x):
+    FP32_input_size = tf.cast(tf.size(x), tf.float32)
+    FP32_input_nonzero = tf.cast(tf.count_nonzero(x), tf.float32)
+    FP32_nonzero_ratio = FP32_input_nonzero / FP32_input_size
     abs_value = tf.abs(x)
     vmax = tf.reduce_max(abs_value)
     s = tf.divide(vmax, 127.)
     x = tf.divide(x, s)
     x = tf.rint(x)
+    INT8_input_nonzero = tf.cast(tf.count_nonzero(x), tf.float32)
+    INT8_nonzero_ratio = INT8_input_nonzero / FP32_input_size
+    return [1-FP32_nonzero_ratio, 1-INT8_nonzero_ratio]
+
+
+def quantize(x, quant=False): #add quant=false to disable quant by default
+    abs_value = tf.abs(x)
+    vmax = tf.reduce_max(abs_value)
+
+    if quant:
+        print("INT8")
+        s = tf.divide(vmax, 127.)
+        x = tf.divide(x, s)
+        x = tf.rint(x)
+    else:
+        print("FP32")
+        s = vmax
     return x, s
 
 
@@ -18,8 +38,14 @@ def conv_2d(x, w, b=None, weight_scale=0., strides=1, padding='SAME', dilations=
     '''
     2D convolution with quantization (float32-->int8)
     '''
+    # add print_out to print info
+    print_out = print_info(x)
+
     # quantize input tensor
-    x, sx = quantize(x)
+    quant = True
+#    quant = False
+    x, sx = quantize(x, quant)
+
     # Actually, convolution compute using float32,
     # because of tensorflow has not supported int8 conv op.
     x = tf.cast(x, dtype=tf.float32)
@@ -31,7 +57,7 @@ def conv_2d(x, w, b=None, weight_scale=0., strides=1, padding='SAME', dilations=
         x = tf.nn.bias_add(x, b)
     if activation == 'relu':
         x = tf.nn.relu(x)
-    return x
+    return x, print_out #add print_out to print info
 
 
 def depthwise_conv2d(x, w, b=None, strides=1, padding='SAME', activation=''):
